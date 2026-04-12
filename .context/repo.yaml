@@ -1,0 +1,149 @@
+# Machine-readable architecture context for darkhorse_neuralynx
+# Used by AI tooling, CI, and documentation generators.
+
+repo:
+  name: darkhorse_neuralynx
+  purpose: >
+    Python orchestration layer that connects Neuralynx ATLAS/Pegasus
+    data acquisition (Windows) with Dark Horse Neuro DHN-AQ (Linux)
+    to record directly into MED (Multiscale Electrophysiology Data) format.
+    Supports both live acquisition and NRD file replay without a monitor.
+  languages: [python, matlab]
+  platforms:
+    orchestrator: [macOS, linux, windows]  # any machine with SSH access
+    pegasus_bridge: [windows]              # requires MatlabNetComClient2_x64.dll
+    dhn_client: [linux]                    # DHN-AQ runs on Ubuntu Linux
+
+machines:
+  - role: pegasus_pc
+    os: Windows 10/11
+    purpose: "Runs Pegasus. Live: receives ATLAS UDP. Replay: reads NRD file from disk."
+    network:
+      hardware_nic:
+        subnet: 192.168.3.0/24
+        ip: 192.168.3.100
+        port: 26090
+        notes: "Static IP, dedicated NIC for ATLAS. Required for live acquisition only."
+      lab_lan:
+        notes: "General lab LAN for NetCom TCP client connections (any subnet)."
+    key_software:
+      - Pegasus v2.3.1
+      - MATLAB (for NetCom_expStarter_ATLAS_AC.m)
+      - MatlabNetComClient2_x64.dll (NetCom client DLL)
+
+  - role: dhn_linux_box
+    os: Ubuntu Linux
+    purpose: "Runs DHN-AQ. Receives ATLAS UDP broadcast. Writes MED files."
+    hardware: "HP Z2 Mini, Intel i9 24-core, 64 GB RAM, 4 TB SSD, 1 GbE fiber NIC"
+    network:
+      hardware_nic:
+        subnet: 192.168.3.0/24
+        ip: 192.168.3.50        # assign statically; any .x except .10 and .100
+        notes: "Must be on same subnet as ATLAS for live acquisition."
+    key_software:
+      - DHN-AQ (DHN Acq)
+      - xvfb                   # virtual display for headless launch
+      - xdotool                # GUI automation for headless Initialize dialog
+
+  - role: atlas_amplifier
+    os: firmware
+    purpose: "Hardware acquisition system. Broadcasts raw neural data as UDP."
+    network:
+      hardware_nic:
+        ip: 192.168.3.10
+        port: 26011
+        notes: "FACTORY FIXED. Cannot change without Neuralynx support."
+
+data_flow:
+  live_acquisition:
+    - step: 1
+      from: atlas_amplifier
+      to: [pegasus_pc, dhn_linux_box]
+      protocol: UDP broadcast
+      subnet: 192.168.3.0/24
+      port: 26090
+      description: "ATLAS broadcasts raw 24-bit samples to entire 192.168.3.x subnet"
+    - step: 2
+      from: pegasus_pc
+      to: pegasus_pc
+      protocol: internal
+      description: "Pegasus applies DSP (filter, subsample), writes NCS + NRD files"
+    - step: 3
+      from: dhn_linux_box
+      to: dhn_linux_box
+      protocol: internal
+      description: "DHN-AQ compresses into MED format with optional encryption"
+
+  nrd_replay:
+    - step: 1
+      from: pegasus_pc
+      to: pegasus_pc
+      protocol: internal
+      description: "Pegasus reads NRD file from disk (no ATLAS hardware needed)"
+    - step: 2
+      from: pegasus_pc
+      to: pegasus_pc
+      protocol: NetCom TCP
+      description: "Python NetCom bridge connects to Pegasus, receives CSC stream"
+    - step: 3
+      from: pegasus_pc
+      to: dhn_linux_box
+      protocol: UDP broadcast (relay)
+      subnet: 192.168.3.0/24
+      port: 26090
+      description: "nrd_stream.py re-broadcasts ATLAS-format UDP packets from NRD data"
+    - step: 4
+      from: dhn_linux_box
+      to: dhn_linux_box
+      protocol: internal
+      description: "DHN-AQ receives relay broadcast as if from live ATLAS hardware"
+
+key_protocols:
+  - name: ATLAS UDP broadcast
+    direction: ATLAS → Pegasus + DHN-AQ
+    transport: UDP
+    subnet: 192.168.3.0/24
+    port: 26090
+    notes: "Raw hardware protocol. DHN-AQ uses this directly, not NetCom."
+
+  - name: NetCom TCP
+    direction: clients → Pegasus server
+    transport: TCP
+    port: "abstracted inside MatlabNetComClient2_x64.dll (not publicly documented)"
+    clients_supported: [MATLAB, Python-ctypes, IronPython, C++, dotnet]
+    notes: "Pegasus provides NetCom server. Clients poll for buffered CSC records."
+
+  - name: SSH
+    direction: orchestrator → dhn_linux_box
+    transport: TCP/22
+    notes: "Used by Python orchestrator to deploy configs and launch DHN-AQ remotely."
+
+config_files:
+  - path: configs/base_rc.yaml
+    role: "Python-friendly source of truth for DHN RC file generation"
+  - path: configs/example_cs.csv
+    role: "Example CS file for 512-channel ATLAS system"
+  - path: configs/example_session.yaml
+    role: "Session parameters consumed by SessionOrchestrator"
+  - path: nrdReplay/Replay_Atlas_generic.cfg
+    role: "Pegasus replay config template; update paths before use"
+  - path: nrdReplay/512csc_modified.cfg
+    role: "Full 512-channel live acquisition Pegasus config (reference)"
+  - path: docs/dhn_api_reference.yaml
+    role: "Complete RC/CS field reference derived from DHN Acq Manual.pdf"
+
+known_issues:
+  - id: DHN_STALL_NO_ATLAS
+    description: >
+      DHN-AQ stalls during NRD replay because ATLAS hardware is absent.
+      Fix: run nrd_stream.NRDRelayBridge to re-broadcast NRD packets as UDP.
+
+  - id: DHN_STALL_WRONG_SUBNET
+    description: >
+      DHN Linux NIC not on 192.168.3.0/24. Assign static IP before launch.
+      Fix: sudo ip addr add 192.168.3.50/24 dev eno1
+
+  - id: DHN_NO_CLI
+    description: >
+      DHN-AQ is GUI-only. Headless operation requires xvfb + xdotool.
+      All RC PROMPT fields must be replaced with real values.

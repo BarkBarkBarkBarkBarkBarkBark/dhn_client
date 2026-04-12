@@ -1,0 +1,59 @@
+title:       "darkhorse_neuralynx"
+description: "Python orchestration pipeline for Neuralynx ATLAS → DHN-AQ neural acquisition"
+
+# Theme — Just the Docs (no Ruby install needed; GitHub Pages renders it automatically)
+remote_theme: just-the-docs/just-the-docs@v0.8.2
+color_scheme: dark
+
+# Site URL (update to your GitHub Pages URL after publishing)
+url: "https://your-org.github.io"
+baseurl: "/darkhorse_neuralynx"
+
+# Navigation
+nav_sort: case_sensitive
+
+# Logo / brand
+# logo: "/assets/logo.png"   # optional — add a brain PNG here
+
+# Search
+search_enabled: true
+search:
+  heading_level: 2
+  previews:      3
+  preview_words_before: 5
+  preview_words_after:  10
+  tokenizer_separator: /[\s/]+/
+  rel_url: true
+  button: false
+
+# Aux links (right of nav)
+aux_links:
+  "GitHub":
+    - "https://github.com/your-org/darkhorse_neuralynx"
+
+aux_links_new_tab: true
+
+# Callout colors
+callouts:
+  note:
+    title: "Note"
+    color: "blue"
+  warning:
+    title: "Warning"
+    color: "yellow"
+  tip:
+    title: "Tip"
+    color: "green"
+  important:
+    title: "Important"
+    color: "purple"
+
+# Footer
+footer_content: "darkhorse_neuralynx — MIT License"
+
+# Exclude from build
+exclude:
+  - "Gemfile"
+  - "Gemfile.lock"
+  - "*.gem"
+  - "vendor/"

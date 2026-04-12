@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "darkhorse-neuralynx"
+version = "0.1.0"
+description = "Python orchestration layer for Neuralynx ATLAS/Pegasus → DHN-AQ (MED) acquisition pipeline"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Lab" }]
+
+dependencies = [
+    "paramiko>=3.4",          # SSH to DHN Linux box
+    "pydantic>=2.6",          # session config validation
+]
+
+[project.optional-dependencies]
+dev = [
+    "pdfplumber>=0.11",       # PDF ingestion (docs generation)
+    "pytest>=8.0",
+    "ruff>=0.4",
+]
+
+[project.scripts]
+dhn-orchestrate = "darkhorse_neuralynx.orchestrator.run:main"
+dhn-diagnose    = "darkhorse_neuralynx.dhn_client.diagnose:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

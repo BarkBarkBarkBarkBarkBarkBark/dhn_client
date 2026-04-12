@@ -1,0 +1,9 @@
+Channel Number,Channel Name,Decimation Frequency,Block Samples,Block Duration,Compression Algorithm,VDS Threshold,VDS LFP Cutoff,VDS Scale by Baseline,Antialias Filter,Line Noise Filter,Line Noise Alerts,Line Noise Alert Amplitude,Line Noise Alert Duration,Channel Description
+1,MACRO0001,2000.0,0,0,PRED,0.0,0.0,0,0,0,0,0.0,0.0,macro electrode 1
+2,MACRO0002,2000.0,0,0,PRED,0.0,0.0,0,0,0,0,0.0,0.0,macro electrode 2
+3,MACRO0003,2000.0,0,0,PRED,0.0,0.0,0,0,0,0,0.0,0.0,macro electrode 3
+4,MACRO0004,2000.0,0,0,PRED,0.0,0.0,0,0,0,0,0.0,0.0,macro electrode 4
+5,MACRO0005,2000.0,0,0,PRED,0.0,0.0,0,0,0,0,0.0,0.0,macro electrode 5
+257,MICRO0001,0.0,0,0,PRED,0.0,0.0,0,0,0,0,0.0,0.0,micro electrode 1
+258,MICRO0002,0.0,0,0,PRED,0.0,0.0,0,0,0,0,0.0,0.0,micro electrode 2
+259,MICRO0003,0.0,0,0,PRED,0.0,0.0,0,0,0,0,0.0,0.0,micro electrode 3

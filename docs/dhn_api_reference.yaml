@@ -1,0 +1,757 @@
+# ============================================================
+# DHN-AQ API Reference  (auto-generated from DHN Acq Manual)
+# Source: DHN Acq Manual.pdf  — Dark Horse Neuro
+# Generated: 2026-04-12
+# ============================================================
+#
+# DHN-AQ is a GUI Linux acquisition application that records neural
+# data directly from Neuralynx ATLAS hardware into MED format.
+# Configuration is entirely file-driven (RC + CS files).
+# No command-line arguments are documented; headless operation
+# requires a virtual display (xvfb) + GUI automation (xdotool).
+#
+# ARCHITECTURE NOTE ─────────────────────────────────────────
+# DHN-AQ is NOT a NetCom client.  It receives raw ATLAS hardware
+# packets over UDP, independently of (and in parallel with) Pegasus.
+# During NRD replay, ATLAS hardware is absent and DHN-AQ will stall
+# unless a relay bridge re-broadcasts ATLAS-format UDP packets.
+# See docs/network_topology.md for the full picture.
+# ────────────────────────────────────────────────────────────
+
+meta:
+  product: DHN-AQ (DHN Acq)
+  vendor: Dark Horse Neuro
+  platform: Ubuntu Linux
+  hardware_target: HP Z2 Mini, Intel i9 24-core, 64 GB RAM,
+                   256 GB system SSD, 4 TB data SSD, 1 GbE fiber NIC
+  output_format: MED (Multiscale Electrophysiology Data)
+  config_files:
+    - type: RC  # Runtime Configuration
+      default_filename: DHN_Acq_rc.txt
+      format: "line-based key-value with %% prefixed labels"
+    - type: CS  # Channel Specification
+      default_filename: DHN_Acq_cs.csv
+      format: CSV with header row
+
+# ────────────────────────────────────────────────────────────
+# STARTUP DIALOG FIELDS  (presented on launch before Initialize)
+# ────────────────────────────────────────────────────────────
+startup_dialog:
+  fields:
+    - name: session_name
+      required: true
+      description: "MED session name (no .medd extension)"
+    - name: channel_specification_file
+      required: false
+      default: DHN_Acq_cs.csv
+      description: "Path to CS CSV file; omit to use rc-specified or default"
+    - name: runtime_configuration_file
+      required: false
+      default: DHN_Acq_rc.txt
+      description: "Path to RC text file; app exits if missing and no default"
+    - name: name_1
+      required: false
+      description: "Subject first name (stored in MED section 3, encryptable)"
+    - name: name_2
+      required: false
+      description: "Subject middle name"
+    - name: name_3
+      required: false
+      description: "Subject last name"
+    - name: id
+      required: false
+      description: "Subject ID / medical record number (alphanumeric)"
+    - name: anonymized_id
+      required: false
+      description: "Anonymized ID stored in universal header of every MED file (unencryptable)"
+  buttons:
+    - Initialize: "Begins acquisition after all fields filled"
+    - Create_CS_File: "Opens CS file editor dialog"
+    - Edit_RC: "Opens RC file editor dialog"
+  sudo_password:
+    description: >
+      Requested on first launch. DHN-AQ requires superuser access to
+      optimize system performance parameters. Password can be saved
+      encrypted for future launches.
+
+# ────────────────────────────────────────────────────────────
+# RUNTIME CONFIGURATION (RC) FILE
+# ────────────────────────────────────────────────────────────
+# RC Format:
+#   Any line NOT beginning with %% is a comment (ignored).
+#   Each entry has required labels in this order:
+#     %% FIELD:
+#     %% NOTES:   (optional, repeatable)
+#     %% TYPE:    [ string | float | integer | ternary ]
+#     %% OPTIONS: (space-delimited; "OPTIONS ONLY" restricts to listed values)
+#     %% DEFAULT:
+#     %% VALUE:
+#
+#   Special VALUE tokens:
+#     DEFAULT   → use the DEFAULT value
+#     NO ENTRY  → string="", float=0.0, integer=0, ternary="UNKNOWN"
+#     PROMPT    → ask user at startup (NOT supported in headless mode)
+
+rc_file:
+
+  # ── Storage ──────────────────────────────────────────────
+  - field: "Primary Data Directory"
+    type: string
+    default: PROMPT
+    notes: "Path does NOT include session directory. Cannot be cloud storage."
+    example_value: "/mnt/dhndev/recordings"
+
+  - field: "Secondary Data Directory"
+    type: string
+    default: "NO ENTRY"
+    notes: "Set to NO ENTRY if not using secondary storage. Cloud path OK (see Cloud Service Provider)."
+    example_value: "/mnt/dhndev/backup"
+
+  - field: "Cloud Service Provider"
+    type: string
+    options: [GOOGLE, AMAZON]
+    default: "NO ENTRY"
+    notes: "Only if secondary storage is cloud."
+
+  - field: "Cloud Utilities Directory"
+    type: string
+    default: "NO ENTRY"
+    notes: "e.g. /home/dhn/DHN/google_cloud/bin"
+
+  - field: "Channel Specification File"
+    type: string
+    default: DHN_Acq_cs.csv
+    notes: "Relative or absolute path to CS file."
+
+  # ── Segmenting ───────────────────────────────────────────
+  - field: "Allow Segmenting"
+    type: ternary
+    options_only: [YES, NO]
+    default: YES
+    notes: "Requires more memory."
+
+  - field: "Auto-Segment Data"
+    type: ternary
+    options_only: [YES, NO]
+    default: YES
+
+  - field: "Auto-Segment Interval"
+    type: string
+    default: "NO ENTRY"
+    notes: "Duration hh:mm (hours). Supersedes Auto-Segment Time."
+
+  - field: "Auto-Segment Time"
+    type: string
+    options: ["SEGMENT AT MIDNIGHT"]
+    default: "SEGMENT AT MIDNIGHT"
+    notes: "24h time hh:mm local. Superseded by Auto-Segment Interval."
+
+  - field: "Auto-Copy Segments"
+    type: ternary
+    options_only: [YES, NO]
+    default: YES
+    notes: "Copy closed segments to secondary storage."
+
+  - field: "Auto-Delete Copied Segments"
+    type: ternary
+    options_only: [YES, NO]
+    default: NO
+
+  - field: "Packet Buffer Seconds"
+    type: float
+    default: 15.0
+    notes: >
+      Reference points (512 channels): slow external drive ~90 sec,
+      fast internal SSD ~3 sec. Only applies when segmenting is allowed.
+
+  - field: "Session Exists Behavior"
+    type: string
+    options_only: ["PROMPT IF EXISTS", OVERWRITE, QUIT]
+    default: "PROMPT IF EXISTS"
+
+  - field: "Include Segmented Session Records"
+    type: ternary
+    options_only: [YES, NO]
+    default: YES
+    notes: "Note + NlxP records go into respective segmented record files."
+
+  - field: "Robust Mode"
+    type: ternary
+    options_only: [YES, NO]
+    default: NO
+    notes: "NOT FULLY IMPLEMENTED. Updates headers every write; more disk wear."
+
+  # ── Compression / Blocks ─────────────────────────────────
+  - field: "Block Samples"
+    type: integer
+    options: ["USE BLOCK DURATION"]
+    default: 50000
+    notes: >
+      25000–75000 good for most use. For VDS, use >=10 sec blocks
+      (select USE BLOCK DURATION and set Block Duration to 10.0+).
+      Supersedes Block Duration when set numerically.
+
+  - field: "Block Duration"
+    type: float
+    options: ["USE BLOCK SAMPLES"]
+    default: "USE BLOCK SAMPLES"
+    notes: "Seconds. Superseded by Block Samples when set numerically."
+
+  - field: "Compression Algorithm"
+    type: string
+    options_only: [RED, PRED, MBE, VDS]
+    default: PRED
+    notes: >
+      RED  – Range Encoded Derivatives (lossless)
+      PRED – Predictive Range Encoded Derivatives (lossless, better CR, slower)
+      MBE  – Minimal Bit Encoding (lossless, fallthrough for degenerate data)
+      VDS  – Vectorized Data Stream (lossy, highest compression)
+
+  - field: "Compression Algorithm Fall Through"
+    type: ternary
+    options_only: [YES, NO]
+    default: YES
+    notes: "For RED/PRED: switch to MBE if MBE yields smaller block."
+
+  - field: "VDS Threshold"
+    type: float
+    range: [0.0, 10.0]
+    default: 5.0
+    notes: "0 = lossless (→ PRED), 10 = very lossy. Fractional values OK."
+
+  - field: "VDS LFP Filter Cutoff"
+    type: float
+    options: ["USE HIGH FREQUENCY FILTER SETTING", "NO FILTER"]
+    default: "USE HIGH FREQUENCY FILTER SETTING"
+    notes: >
+      Excises transients, lowpass filters, restores transients.
+      Reduces baseline variance → higher CR. Example: 500.0 Hz.
+
+  - field: "VDS Scale by Baseline"
+    type: ternary
+    options_only: [YES, NO]
+    default: NO
+    notes: "Scales each block by baseline amplitude width. ~30% more compression, minor fidelity loss."
+
+  # ── Filters ──────────────────────────────────────────────
+  - field: "Antialias Filter"
+    type: ternary
+    options_only: [YES, NO]
+    default: YES
+    notes: "Rolloff starts at 4 samples/cycle."
+
+  - field: "Line Noise Filter"
+    type: ternary
+    options_only: [YES, NO]
+    default: NO
+    notes: "Reduces line noise without attenuating physiology. Better with longer blocks (>=10 s)."
+
+  - field: "Low Frequency Filter Setting"
+    type: float
+    default: "NO ENTRY"
+    notes: "Hz"
+    example_value: 0.0
+
+  - field: "High Frequency Filter Setting"
+    type: float
+    default: 9000.0
+    notes: "Hz. 9 kHz = analog antialiasing cutoff in Nlx hardware."
+
+  - field: "Notch Filter Frequency Setting"
+    type: float
+    default: "NO ENTRY"
+    notes: "Hz"
+
+  - field: "AC Line Frequency"
+    type: float
+    options: [50.0, 60.0]
+    default: "NO ENTRY"
+    notes: "50 Hz Europe/Africa/Asia/Australia; 60 Hz Americas."
+
+  # ── Units & Metadata ─────────────────────────────────────
+  - field: "Amplitude Units Conversion Factor"
+    type: float
+    default: 1.0
+
+  - field: "Amplitude Units Description"
+    type: string
+    default: microvolts
+
+  - field: "Time Base Units Conversion Factor"
+    type: float
+    default: 1.0
+
+  - field: "Time Base Units Description"
+    type: string
+    default: microseconds
+
+  - field: "Apply Recording Time Offset"
+    type: ternary
+    options_only: [YES, NO]
+    default: YES
+
+  - field: "Standard Timezone Acronym"
+    type: string
+    default: "NO ENTRY"
+    notes: "e.g. MST (not MT or MDT). Required for multi-timezone territories."
+
+  - field: "Recording Country"
+    type: string
+    default: "NO ENTRY"
+
+  - field: "Recording Territory"
+    type: string
+    default: "NO ENTRY"
+    notes: "US only: 2-letter state abbreviation required for DST accuracy."
+
+  - field: "Recording Locality"
+    type: string
+    default: "NO ENTRY"
+    notes: "City / township / village."
+
+  - field: "Recording Institution"
+    type: string
+    default: "NO ENTRY"
+
+  - field: "Session Description"
+    type: string
+    default: "NO ENTRY"
+
+  - field: "Equipment Description"
+    type: string
+    default: "NO ENTRY"
+    example_value: "Neuralynx Atlas / Pegasus acquisition system"
+
+  - field: "Reference Description"
+    type: string
+    default: "NO ENTRY"
+
+  # ── Encryption ───────────────────────────────────────────
+  # Levels: LEVEL 0 (none), LEVEL 1 (password protected), LEVEL 2 (higher-privilege)
+  # Level 2 passwords grant access to both level 1 and 2 fields.
+  - field: "Metadata Section 2 Encryption Level"
+    type: string
+    options_only: ["LEVEL 0", "LEVEL 1", "LEVEL 2"]
+    default: "LEVEL 1"
+    notes: "Technical recording data."
+
+  - field: "Metadata Section 3 Encryption Level"
+    type: string
+    options_only: ["LEVEL 0", "LEVEL 1", "LEVEL 2"]
+    default: "LEVEL 2"
+    notes: "Subject identifying data."
+
+  - field: "Time Series Data Encryption Level"
+    type: string
+    options_only: ["LEVEL 0", "LEVEL 1", "LEVEL 2"]
+    default: "LEVEL 0"
+
+  - field: "Segment Record Encryption Level"
+    type: string
+    options_only: ["LEVEL 0", "LEVEL 1", "LEVEL 2"]
+    default: "LEVEL 1"
+
+  - field: "Neuralynx Port Record Encryption Level"
+    type: string
+    options_only: ["LEVEL 0", "LEVEL 1", "LEVEL 2"]
+    default: "LEVEL 0"
+    notes: "Neuralynx parallel port events."
+
+  - field: "Annotation Record Encryption Level"
+    type: string
+    options_only: ["LEVEL 0", "LEVEL 1", "LEVEL 2"]
+    default: "LEVEL 2"
+    notes: "User notes entered during acquisition."
+
+  - field: "System Log Record Encryption Level"
+    type: string
+    options_only: ["LEVEL 0", "LEVEL 1", "LEVEL 2"]
+    default: "LEVEL 0"
+
+  - field: "Level 1 Password"
+    type: string
+    default: "NO ENTRY"
+    notes: "NO ENTRY equivalent to LEVEL 0 (no encryption)."
+
+  - field: "Level 1 Password Hint"
+    type: string
+    default: "NO ENTRY"
+
+  - field: "Level 2 Password"
+    type: string
+    default: "NO ENTRY"
+
+  - field: "Level 2 Password Hint"
+    type: string
+    default: "NO ENTRY"
+
+  - field: "Level 3 Password"
+    type: string
+    options: ["USE DHN L3 PW"]
+    default: "NO ENTRY"
+    notes: >
+      Failsafe for L1/L2 recovery. USE DHN L3 PW = Dark Horse Neuro
+      proprietary password; DHN can retrieve lost passwords.
+
+  - field: "Include Session-level Segment Records"
+    type: ternary
+    options_only: [YES, NO]
+    default: YES
+    notes: "Tiny footprint; significantly improves search performance."
+
+  - field: "Include Channel-level Segment Records"
+    type: ternary
+    options_only: [YES, NO]
+    default: YES
+
+  # ── Neuralynx Port / Events ──────────────────────────────
+  - field: "Include Neuralynx Port Records"
+    type: ternary
+    options_only: [YES, NO]
+    default: YES
+
+  - field: "Neuralynx Port Trigger Mode"
+    type: string
+    options_only: ["NO TRIGGER", "ANY CHANGE", "HIGH BIT SET"]
+    default: "HIGH BIT SET"
+
+  - field: "Neuralynx Port Zero is Reset"
+    type: ternary
+    options_only: [YES, NO]
+    default: YES
+    notes: >
+      NO TRIGGER: stores values only when subport is non-zero.
+      ANY CHANGE: stores onset/time pairs only (no offset times).
+
+  - field: "Number of Subports in Neuralynx Port"
+    type: integer
+    options_only: [1, 2, 4]
+    default: 2
+    notes: "1 = no subports (full 32 bits)."
+
+  # ── Remote Notifications ─────────────────────────────────
+  - field: "Remote Notification Email Address"
+    type: string
+    default: "NO ENTRY"
+
+  - field: "Remote Notification Email Addressee"
+    type: string
+    default: "NO ENTRY"
+
+  - field: "Remote Notification Text Number"
+    type: string
+    default: "NO ENTRY"
+    notes: "Hyphens/spaces/parens/commas stripped; plus signs kept."
+
+  - field: "Remote Notification for Alerts"
+    type: ternary
+    options_only: [YES, NO]
+    default: NO
+
+  - field: "Remote Alert Notification Medium"
+    type: string
+    options_only: [TEXT, EMAIL, "TEXT AND EMAIL"]
+    default: "TEXT AND EMAIL"
+
+  - field: "Use Watchdog Service"
+    type: ternary
+    options_only: [YES, NO]
+    default: YES
+    notes: "Alerts if DHN-AQ terminates unexpectedly. Requires notification medium."
+
+  - field: "Remote Notification for Updates"
+    type: ternary
+    options_only: [YES, NO]
+    default: NO
+
+  - field: "Remote Update Notification Medium"
+    type: string
+    options_only: [TEXT, EMAIL, "TEXT AND EMAIL"]
+    default: EMAIL
+
+  - field: "Remote Update Notification Frequency"
+    type: float
+    default: 1.0
+    notes: "Hours."
+
+  # ── NETWORK / CONNECTION  ────────────────────────────────
+  # CRITICAL: DHN-AQ connects to raw ATLAS hardware UDP broadcast.
+  # It is NOT a NetCom TCP client.
+  # Defaults assume direct ATLAS connection on 192.168.3.x/24.
+  # For NRD replay, point these at a relay bridge instead.
+
+  - field: "Neuralynx PC MAC Address"
+    type: string
+    default: "00:00:00:00:00:00"
+    required: true
+    notes: >
+      MAC address of the Neuralynx acquisition PC (192.168.3.100).
+      On the Windows PC: run ipconfig /all, find NIC at 192.168.3.100,
+      copy MAC and replace hyphens with colons.
+      NOT required in local broadcast mode (Receive As Broadcast: YES).
+
+  - field: "Receive As Broadcast"
+    type: ternary
+    options_only: [YES, NO]
+    default: NO
+    notes: >
+      YES = receive as local subnet broadcast (MAC not required).
+      NO  = unicast connection; MAC address required.
+      For NRD relay bridge, set to YES.
+
+  - field: "Receiving Local EN Interface Name"
+    type: string
+    default: eno1
+    notes: >
+      Linux NIC name connected to Neuralynx/relay subnet.
+      Check with: ip link show  (may be eno1, eth0, enp3s0, etc.)
+
+  - field: "Receiving Local IP Address"
+    type: string
+    default: "192.168.3.100"
+    notes: >
+      IP of DHN Linux box NIC connected to Neuralynx/relay subnet.
+      For live ATLAS: must be on 192.168.3.0/24.
+      For NRD relay bridge: must match the relay bridge's subnet.
+
+  - field: "Receiving Server IP Address"
+    type: string
+    default: "192.168.3.10"
+    notes: >
+      IP of the ATLAS amplifier (live), OR the relay bridge server (replay).
+      ATLAS default: 192.168.3.10 (hardware-fixed, cannot change without Nlx support).
+      NRD relay bridge: set to the Windows Pegasus PC IP on the lab LAN.
+
+  - field: "Receiving Port Number"
+    type: integer
+    default: 26090
+    notes: >
+      26090 is the Neuralynx ATLAS hardware port (hard-coded in firmware).
+      For relay bridge: must match the port on which the bridge broadcasts.
+      DO NOT change for live ATLAS connections.
+
+  - field: "Receiving Subnet Mask"
+    type: string
+    default: "255.255.255.0"
+
+  # ── Packet Forwarding (DHN → second DHN) ─────────────────
+  - field: "Forward Neuralynx Packets"
+    type: ternary
+    options_only: [YES, NO]
+    default: NO
+    notes: >
+      DHN-AQ can forward received ATLAS packets on a second NIC.
+      Cannot forward back to the Nlx acquisition PC (control channel conflict).
+
+  - field: "Forward As Broadcast"
+    type: ternary
+    options_only: [YES, NO]
+    default: NO
+
+  - field: "Forwarding Local EN Interface Name"
+    type: string
+    default: eno1
+
+  - field: "Forwarding Local IP Address"
+    type: string
+    default: "192.168.1.10"
+    notes: "Must be a different subnet from Neuralynx input."
+
+  - field: "Forwarding Client IP Address"
+    type: string
+    default: "192.168.1.100"
+    notes: "Not required in broadcast mode."
+
+  - field: "Forwarding Port Number"
+    type: integer
+    default: 26091
+    notes: "Cannot be 26090 (Nlx hardware port, hard-coded)."
+
+  - field: "Forwarding Subnet Mask"
+    type: string
+    default: "255.255.255.0"
+
+  - field: "Non-blocking Forwarding"
+    type: ternary
+    options_only: [YES, NO]
+    default: NO
+    notes: >
+      YES: forwarding won't stall main acquisition (recommended for high channel counts).
+      May result in some packet drop on the forwarding socket.
+
+# ────────────────────────────────────────────────────────────
+# CHANNEL SPECIFICATION (CS) FILE
+# ────────────────────────────────────────────────────────────
+cs_file:
+  format: CSV
+  header_row: required
+  columns:
+    1:
+      name: Channel Number
+      type: integer
+      notes: "Physical input plug number. MED numbering starts at 1."
+    2:
+      name: Channel Name
+      type: string
+      notes: "Base name, no extension. Software adds MED extensions."
+    3:
+      name: Decimation Frequency
+      type: float
+      notes: "Hz. 0 = disabled. Antialiasing filter applied before decimation."
+    4:
+      name: Block Samples
+      type: integer
+      notes: "Samples per compressed block. 0 = use Block Duration or RC value."
+    5:
+      name: Block Duration
+      type: float
+      notes: "Microseconds. Superseded by Block Samples if that is non-zero."
+    6:
+      name: Compression Algorithm
+      type: string
+      values: [RED, PRED, MBE, VDS]
+    7:
+      name: VDS Threshold
+      type: float
+      range: [0.0, 10.0]
+      notes: "VDS only."
+    8:
+      name: VDS LFP Cutoff
+      type: float
+      notes: "VDS only. LFP highpass cutoff Hz."
+    9:
+      name: VDS Scale by Baseline
+      type: integer
+      values: {-1: false, 0: "use RC value", 1: true}
+    10:
+      name: Antialias Filter
+      type: integer
+      values: {-1: false, 0: "use RC value", 1: true}
+    11:
+      name: Line Noise Filter
+      type: integer
+      values: {-1: false, 0: "use RC value", 1: true}
+    12:
+      name: Line Noise Alerts
+      type: integer
+      values: {-1: false, 0: "use RC value", 1: true}
+    13:
+      name: Line Noise Alert Amplitude
+      type: float
+      notes: "Percentage of overall amplitude. Used with column 14."
+    14:
+      name: Line Noise Alert Duration
+      type: float
+      notes: "Seconds above amplitude threshold before alerting."
+    15:
+      name: Channel Description
+      type: string
+      notes: "Max 1023 ASCII / 255 UTF-8 chars. No newlines. Punctuation OK."
+
+# ────────────────────────────────────────────────────────────
+# VDS COMPRESSION REFERENCE TABLE
+# (384 ch, 30 kHz, 10-sec blocks, 8-core 3 GHz Intel Xeon)
+# ────────────────────────────────────────────────────────────
+vds_compression_table:
+  note: "CR = compressed_size / uncompressed_size (16-bit input)"
+  lossless:
+    - config: "No AA, No NFF"
+      speed_x_realtime: 49.18
+      compression_ratio_pct: 37.01
+    - config: "+AA, No NFF"
+      speed_x_realtime: 20.34
+      compression_ratio_pct: 32.01
+    - config: "No AA, +NFF"
+      speed_x_realtime: 18.97
+      compression_ratio_pct: 23.65
+    - config: "+AA, +NFF"
+      speed_x_realtime: 18.94
+      compression_ratio_pct: 22.92
+  vds_no_lfp_filter:
+    - threshold: 1;  speed: 1.40;  cr_pct: 27.26;  cr_scaled_pct: 18.30
+    - threshold: 3;  speed: 1.80;  cr_pct: 21.60;  cr_scaled_pct: 15.47
+    - threshold: 5;  speed: 2.24;  cr_pct: 16.00;  cr_scaled_pct: 11.78
+    - threshold: 7;  speed: 2.63;  cr_pct: 10.40;  cr_scaled_pct:  8.03
+    - threshold: 9;  speed: 1.98;  cr_pct:  4.80;  cr_scaled_pct:  3.89
+  vds_lfp_500hz:
+    - threshold: 1;  speed: 2.44;  cr_pct: 10.02;  cr_scaled_pct:  7.31
+    - threshold: 5;  speed: 2.72;  cr_pct:  6.03;  cr_scaled_pct:  4.53
+    - threshold: 9;  speed: 2.69;  cr_pct:  2.00;  cr_scaled_pct:  1.54
+  vds_lfp_200hz:
+    - threshold: 1;  speed: 1.23;  cr_pct:  8.53;  cr_scaled_pct:  6.11
+    - threshold: 5;  speed: 2.72;  cr_pct:  5.27;  cr_scaled_pct:  3.89
+    - threshold: 9;  speed: 2.74;  cr_pct:  1.78;  cr_scaled_pct:  1.35
+
+# ────────────────────────────────────────────────────────────
+# CPU THROTTLING RISKS
+# ────────────────────────────────────────────────────────────
+cpu_throttling:
+  required_conditions:
+    - Display is ON
+    - "At least some channels recorded with VDS and recording active"
+  risk_factors:
+    - Low CPU core count
+    - High displayed channel count
+    - Large scrollable channel area
+    - Scroll mode (vs sweep mode)
+    - Many VDS-compressed channels
+    - Line noise filtering
+    - High sampling frequencies
+    - No decimated channels
+    - High ambient temperature
+  auto_mitigation: >
+    CPU monitor detects throttling onset and automatically disables display.
+    Dialog shown; user can pause recording, pause display, or switch to PRED.
+  headless_implication: >
+    Running headless (display OFF) eliminates the primary throttling risk.
+    This is an advantage of programmatic/headless operation.
+
+# ────────────────────────────────────────────────────────────
+# KNOWN CONSTRAINTS & LIMITATIONS
+# ────────────────────────────────────────────────────────────
+constraints:
+  - id: SINGLE_HARDWARE_SOURCE
+    description: >
+      DHN-AQ receives from exactly one source at a time:
+      either the ATLAS amplifier or a forwarding server.
+      It is NOT a Neuralynx NetCom TCP client.
+
+  - id: NO_CLI_MODE
+    description: >
+      DHN-AQ is GUI-only. There are no documented command-line arguments.
+      Headless operation requires a virtual display (xvfb-run) and
+      GUI automation (e.g. xdotool, pyautogui, AT-SPI).
+
+  - id: NO_PROMPT_HEADLESS
+    description: >
+      RC fields with VALUE: PROMPT will cause DHN-AQ to block waiting
+      for user input. All PROMPT values must be replaced with real values
+      for headless operation. Primary Data Directory defaults to PROMPT.
+
+  - id: ATLAS_IP_FIXED
+    description: >
+      The ATLAS amplifier IP (192.168.3.10) is factory-configured in
+      firmware. Changing it requires Neuralynx support.
+
+  - id: PEGASUS_IP_STATIC
+    description: >
+      The Pegasus Windows PC must have a static IP on 192.168.3.0/24
+      (typically 192.168.3.100) on a dedicated NIC separate from
+      the lab's general LAN.
+
+  - id: NRD_REPLAY_NO_DHN_DIRECT
+    description: >
+      During Pegasus NRD replay, Pegasus does NOT re-emit raw ATLAS
+      hardware broadcast packets. DHN-AQ will stall waiting for packets
+      that never arrive. A relay bridge is required for NRD replay + DHN-AQ.
+
+  - id: ROBUST_MODE_NOT_IMPLEMENTED
+    description: >
+      "Robust Mode" (update file headers every write) is listed in the RC
+      file but is noted as NOT FULLY IMPLEMENTED.
+
+  - id: LINE_NOISE_ALERTS_NOT_ENABLED
+    description: >
+      Line Noise Alerts, Line Noise Alert Amplitude Threshold, and
+      Line Noise Alert Duration Threshold are NOT CURRENTLY ENABLED
+      despite appearing in the RC file.

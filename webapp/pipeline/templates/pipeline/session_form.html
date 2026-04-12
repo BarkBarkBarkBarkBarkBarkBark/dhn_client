@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — darkhorse_neuralynx{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{% url 'dashboard' %}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Back
+  </a>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+<div class="col-xl-9 col-xxl-8">
+
+<form method="post" id="session-form" novalidate>
+{% csrf_token %}
+
+{# ── Mode selector (big toggle cards) ───────────────────────────────────── #}
+<div class="dhn-card mb-4">
+  <div class="dhn-card-header">
+    <i class="bi bi-record-circle me-2"></i>Acquisition Mode
+  </div>
+  <div class="p-4">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="dhn-mode-card" id="card-live">
+          <input type="radio" name="mode" value="live" class="d-none"
+                 {% if form.mode.value == "live" or not form.instance.pk %}{% endif %}>
+          <div class="dhn-mode-icon">📡</div>
+          <div class="dhn-mode-title">Live ATLAS Acquisition</div>
+          <div class="dhn-mode-desc">
+            ATLAS hardware is present and broadcasting UDP.<br>
+            DHN-AQ connects <strong>directly</strong> to ATLAS — no relay bridge needed.
+          </div>
+          <div class="mt-2">
+            <span class="badge bg-info text-dark">Recommended for live experiments</span>
+          </div>
+        </label>
+      </div>
+      <div class="col-md-6">
+        <label class="dhn-mode-card" id="card-replay">
+          <input type="radio" name="mode" value="replay" class="d-none"
+                 {% if form.mode.value == "replay" or not form.instance.pk %}checked{% endif %}>
+          <div class="dhn-mode-icon">🎬</div>
+          <div class="dhn-mode-title">NRD File Replay</div>
+          <div class="dhn-mode-desc">
+            No hardware — Pegasus replays an <code>.nrd</code> file.<br>
+            Python relay bridge re-broadcasts as ATLAS UDP for DHN-AQ.
+          </div>
+          <div class="mt-2">
+            <span class="badge bg-secondary">Uses NRD relay bridge</span>
+          </div>
+        </label>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Session info ────────────────────────────────────────────────────────── #}
+<div class="dhn-card mb-4">
+  <div class="dhn-card-header">
+    <i class="bi bi-tag me-2"></i>Session Info
+  </div>
+  <div class="p-4">
+    <div class="mb-3">
+      <label class="form-label fw-semibold">{{ form.name.label }}</label>
+      {{ form.name }}
+      {% if form.name.errors %}
+        <div class="text-danger small mt-1">{{ form.name.errors }}</div>
+      {% endif %}
+    </div>
+    <div class="mb-0">
+      <label class="form-label fw-semibold">{{ form.description.label }}</label>
+      {{ form.description }}
+    </div>
+  </div>
+</div>
+
+{# ── Network config ──────────────────────────────────────────────────────── #}
+<div class="dhn-card mb-4">
+  <div class="dhn-card-header" data-bs-toggle="collapse" data-bs-target="#net-collapse"
+       role="button" aria-expanded="true">
+    <i class="bi bi-diagram-2 me-2"></i>Network Configuration
+    <i class="bi bi-chevron-down ms-auto float-end"></i>
+  </div>
+  <div class="collapse show" id="net-collapse">
+    <div class="p-4">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">{{ form.atlas_ip.label }}</label>
+          {{ form.atlas_ip }}
+          <div class="form-text">{{ form.atlas_ip.help_text }}</div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">{{ form.pegasus_ip.label }}</label>
+          {{ form.pegasus_ip }}
+          <div class="form-text">{{ form.pegasus_ip.help_text }}</div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">{{ form.dhn_ip.label }}</label>
+          {{ form.dhn_ip }}
+          <div class="form-text">{{ form.dhn_ip.help_text }}</div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">{{ form.dhn_interface.label }}</label>
+          {{ form.dhn_interface }}
+          <div class="form-text">{{ form.dhn_interface.help_text }}</div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">{{ form.dhn_ssh_user.label }}</label>
+          {{ form.dhn_ssh_user }}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">{{ form.broadcast_ip.label }}</label>
+          {{ form.broadcast_ip }}
+          <div class="form-text">{{ form.broadcast_ip.help_text }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Replay (NRD file) — hidden for live mode ────────────────────────────── #}
+<div class="dhn-card mb-4" id="replay-section">
+  <div class="dhn-card-header">
+    <i class="bi bi-file-earmark-play me-2"></i>NRD Replay Settings
+    <span class="badge bg-secondary ms-2 align-middle">Replay mode only</span>
+  </div>
+  <div class="p-4">
+    <div class="row g-3">
+      <div class="col-md-8">
+        <label class="form-label fw-semibold">{{ form.nrd_file.label }}</label>
+        {{ form.nrd_file }}
+        <div class="form-text">{{ form.nrd_file.help_text }}</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">{{ form.relay_port.label }}</label>
+        {{ form.relay_port }}
+        <div class="form-text">{{ form.relay_port.help_text }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── DHN-AQ config ───────────────────────────────────────────────────────── #}
+<div class="dhn-card mb-4">
+  <div class="dhn-card-header" data-bs-toggle="collapse" data-bs-target="#dhn-collapse"
+       role="button" aria-expanded="true">
+    <i class="bi bi-cpu me-2"></i>DHN-AQ Configuration
+    <i class="bi bi-chevron-down ms-auto float-end"></i>
+  </div>
+  <div class="collapse show" id="dhn-collapse">
+    <div class="p-4">
+      <div class="row g-3">
+        <div class="col-12">
+          <label class="form-label fw-semibold">{{ form.data_dir.label }}</label>
+          {{ form.data_dir }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">{{ form.n_macro.label }}</label>
+          {{ form.n_macro }}
+          <div class="form-text">Macro / LFP channels</div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">{{ form.n_micro.label }}</label>
+          {{ form.n_micro }}
+          <div class="form-text">Micro / spike channels</div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">{{ form.macro_decimation_hz.label }}</label>
+          {{ form.macro_decimation_hz }}
+          <div class="form-text">{{ form.macro_decimation_hz.help_text }}</div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">{{ form.micro_decimation_hz.label }}</label>
+          {{ form.micro_decimation_hz }}
+          <div class="form-text">{{ form.micro_decimation_hz.help_text }}</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">{{ form.compression.label }}</label>
+          {{ form.compression }}
+          <div class="form-text">{{ form.compression.help_text }}</div>
+        </div>
+        <div class="col-md-12">
+          <div class="dhn-info-box">
+            <i class="bi bi-info-circle me-2"></i>
+            <strong>Total channels:</strong> <span id="channel-total">512</span>
+            &emsp;
+            <strong>Micro at full rate:</strong>
+            <span id="micro-rate">32 kHz (no decimation)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Advanced (MATLAB) ───────────────────────────────────────────────────── #}
+<div class="dhn-card mb-4">
+  <div class="dhn-card-header" data-bs-toggle="collapse" data-bs-target="#matlab-collapse"
+       role="button" aria-expanded="false">
+    <i class="bi bi-gear me-2"></i>Advanced — MATLAB expStarter
+    <i class="bi bi-chevron-down ms-auto float-end"></i>
+  </div>
+  <div class="collapse" id="matlab-collapse">
+    <div class="p-4">
+      <div class="mb-3">
+        <div class="form-check">
+          {{ form.matlab_enabled }}
+          <label class="form-check-label" for="{{ form.matlab_enabled.id_for_label }}">
+            {{ form.matlab_enabled.label }}
+          </label>
+        </div>
+        <div class="form-text">Requires MATLAB installed on the Pegasus PC.</div>
+      </div>
+      <div class="mb-0" id="timestamps-field" style="display:none">
+        <label class="form-label fw-semibold">{{ form.timestamps_file.label }}</label>
+        {{ form.timestamps_file }}
+        <div class="form-text">{{ form.timestamps_file.help_text }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Submit ──────────────────────────────────────────────────────────────── #}
+<div class="d-flex gap-3 justify-content-end mb-5">
+  <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">Cancel</a>
+  <button type="submit" class="btn btn-purple btn-lg px-5">
+    <i class="bi bi-check-lg me-2"></i>Save Session
+  </button>
+</div>
+
+</form>
+</div><!-- /.col -->
+</div><!-- /.row -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Mode toggle cards ────────────────────────────────────────────────────
+function initModeCards() {
+  const radios = document.querySelectorAll('input[name="mode"]');
+  const replaySection = document.getElementById('replay-section');
+
+  function updateMode() {
+    const live = document.querySelector('input[name="mode"][value="live"]').checked;
+    document.getElementById('card-live').classList.toggle('selected', live);
+    document.getElementById('card-replay').classList.toggle('selected', !live);
+    replaySection.style.display = live ? 'none' : '';
+  }
+
+  // Make whole card clickable
+  document.getElementById('card-live').addEventListener('click', () => {
+    document.querySelector('input[name="mode"][value="live"]').checked = true;
+    updateMode();
+  });
+  document.getElementById('card-replay').addEventListener('click', () => {
+    document.querySelector('input[name="mode"][value="replay"]').checked = true;
+    updateMode();
+  });
+
+  updateMode();
+}
+
+// ── Channel total live update ────────────────────────────────────────────
+function initChannelCalc() {
+  const nMacro = document.getElementById('id_n_macro');
+  const nMicro = document.getElementById('id_n_micro');
+  const microHz = document.getElementById('id_micro_decimation_hz');
+  const totalEl = document.getElementById('channel-total');
+  const rateEl  = document.getElementById('micro-rate');
+
+  function update() {
+    const total = (parseInt(nMacro.value)||0) + (parseInt(nMicro.value)||0);
+    totalEl.textContent = total;
+    const hz = parseFloat(microHz.value)||0;
+    rateEl.textContent = hz === 0 ? '32 kHz (no decimation)' : `${hz.toLocaleString()} Hz`;
+  }
+
+  [nMacro, nMicro, microHz].forEach(el => el?.addEventListener('input', update));
+  update();
+}
+
+// ── MATLAB toggle ────────────────────────────────────────────────────────
+function initMatlabToggle() {
+  const chk = document.getElementById('id_matlab_enabled');
+  const tsField = document.getElementById('timestamps-field');
+  chk?.addEventListener('change', () => {
+    tsField.style.display = chk.checked ? '' : 'none';
+  });
+  if (chk?.checked) tsField.style.display = '';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  initModeCards();
+  initChannelCalc();
+  initMatlabToggle();
+});
+</script>
+{% endblock %}

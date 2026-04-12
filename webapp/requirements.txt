@@ -1,0 +1,8 @@
+# darkhorse_neuralynx webapp dependencies
+# Install with:  pip install -r requirements.txt
+
+Django>=5.0,<6.0
+paramiko>=3.4          # SSH to DHN Linux box
+pydantic>=2.6          # session config validation
+PyYAML>=6.0            # YAML session configs
+pdfplumber>=0.11       # PDF ingestion (docs only)

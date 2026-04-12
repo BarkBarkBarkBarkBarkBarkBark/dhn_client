@@ -1,0 +1,49 @@
+NRD doesn’t apply the same filters/manipulations that you see on .NCS files
+Files needed:
+1. RawData.nrd
+2. Config file (p98cs_replay_sc.cfg) <-- will need to update file paths (top of script)
+a. MICROS - SetSubSamplingInterleave should always be 1 (we don’t subsample from 32k
+on micro channels)
+b. MACROS – The SubSampling is typically at 16 (corresponds to 2k Hz)
+c. Replay_Atlas_generic.cfg -- use this to make config file
+i. make separate file for the .nrd and .cfg file within nrd_replay folder
+ii. change SetDataDirectory “C:\dataReplay\XXXX” to the new folder location and
+RawDataFile “XXX-SPECIFY.nrd” to the specific file location
+1. copy address as text
+iii. delete extraneous stuff between “-SetNetComDataBufferSize Events 3000” and
+“-CreateCscAcqEnt”
+iv. copy paste the “-CreateCscAcqEnt” part to correspond w/ # of CSC channels
+1. 0-255 or 1-256 are all macros for UC Davis data
+v. delete overlap between micros/macros -> save file
+1. delete macros if necessary?
+vi. MAKE SURE YOU UPLOAD THE CONFIG FILE WITHIN FOLDER YOU JUST MADE
+(CHECK UPDATED TIME)
+Software needed:
+- Also need Pegasus software (skip license file, we’re not using this for actual recording, just
+getting data)
+o open + start with new data file/setup
+- MATLAB Script – NetCome_expStarter_ATLAS_AC.m (that interfaces with Pegasus software)
+o Calls NLX helper files from package folder “neuralynxNetcom201” (under nrd replay,
+make sure to add this to the path)
+o If you redownload NetCome_expStarter_ATLAS_AC.m (Nov 26, 2024), make sure to
+comment out lines 17 + 24, and update the timestamps in the code as usual
+After uploading config file to Pegasus
+- Pegasus software > Raw Data file Playback Properties
+o Filename – update this to what you did in the config file
+o UNCHECK continuous file playback
+o Change playback speed to the SLOWEST (otherwise we might have dropped samples)
+o Timestamp range – update matlab script (line 23) with what you see in pegasus software
+- Pegasus Software > Add Window > Time Window > Display > Add Plots > Add like 15 CSC rows
+o Micros: View > Acquisition Entities and Display Properties > Under entities > CSC (#s
+should align with config file) > Select all the CSC (micros) > Sample freq should be 32k
+Hz, Input range should be 3000 uV, sub-sampling is 1, Low cut is 0.1 Hz, No High cut
+appliedo Macros: Input rage should be 10k uV, Remove high Cut as well, sub sampling interleave
+16
+- Run MATLAB Script > Then on Pegasus, ACQ turns green, REC turns purple
+o If both are gray, just click the REC button so that both are green/purple respectively
+o make sure you drag expStarter file into new folder
+When finished replaying
+A folder will be generated with today’s date/time
+- Folder has a bunch of NCS files
+- Also has event file (for TTLs)
+

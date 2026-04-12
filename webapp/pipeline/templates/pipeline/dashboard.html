@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — darkhorse_neuralynx{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{% url 'session_new' %}" class="btn btn-purple btn-sm">
+    <i class="bi bi-plus-lg me-1"></i>New Session
+  </a>
+{% endblock %}
+
+{% block content %}
+
+{# ── Active session banner ───────────────────────────────────────────────── #}
+{% if active_session %}
+<div class="dhn-active-banner mb-4" id="active-banner">
+  <div class="d-flex align-items-center gap-3">
+    <span class="dhn-pulse-dot"></span>
+    <div>
+      <div class="fw-semibold">{{ active_session.name }}</div>
+      <small class="text-muted">{{ active_session.get_mode_display }} &mdash;
+        <span id="banner-status">{{ active_session.get_status_display }}</span>
+        &bull; <span id="banner-packets">{{ active_session.packets_sent|default:"0" }}</span> pkts
+      </small>
+    </div>
+    <div class="ms-auto d-flex gap-2">
+      <a href="{% url 'session_detail' active_session.pk %}" class="btn btn-sm btn-outline-light">
+        <i class="bi bi-terminal me-1"></i>View Logs
+      </a>
+      <form method="post" action="{% url 'session_stop' active_session.pk %}" class="d-inline">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm btn-danger">
+          <i class="bi bi-stop-fill me-1"></i>Stop
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ── Stats row ───────────────────────────────────────────────────────────── #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="dhn-stat-card">
+      <div class="dhn-stat-value">{{ sessions|length }}</div>
+      <div class="dhn-stat-label">Total sessions</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="dhn-stat-card">
+      <div class="dhn-stat-value text-success">
+        {{ sessions|selectattr:"status", "equalto", "completed"|list|length }}
+      </div>
+      <div class="dhn-stat-label">Completed</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="dhn-stat-card">
+      <div class="dhn-stat-value text-danger">
+        {{ sessions|selectattr:"status", "equalto", "error"|list|length }}
+      </div>
+      <div class="dhn-stat-label">Errors</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="dhn-stat-card">
+      {% if active_session %}
+        <div class="dhn-stat-value text-warning dhn-blink">●</div>
+        <div class="dhn-stat-label">Recording</div>
+      {% else %}
+        <div class="dhn-stat-value text-muted">—</div>
+        <div class="dhn-stat-label">No active session</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{# ── Main grid ───────────────────────────────────────────────────────────── #}
+<div class="row g-4">
+
+  {# Sessions list #}
+  <div class="col-lg-7">
+    <div class="dhn-card h-100">
+      <div class="dhn-card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-journal-text me-2"></i>Recent Sessions</span>
+        <a href="{% url 'session_new' %}" class="btn btn-sm btn-outline-purple">
+          <i class="bi bi-plus"></i> New
+        </a>
+      </div>
+
+      {% if sessions %}
+      <div class="table-responsive">
+        <table class="table table-dark table-hover mb-0 dhn-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Mode</th>
+              <th>Status</th>
+              <th>Channels</th>
+              <th>Duration</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in sessions %}
+            <tr>
+              <td class="fw-semibold">
+                <a href="{% url 'session_detail' s.pk %}" class="text-light text-decoration-none">
+                  {{ s.name }}
+                </a>
+              </td>
+              <td>
+                {% if s.mode == "live" %}
+                  <span class="badge bg-info text-dark"><i class="bi bi-broadcast me-1"></i>Live</span>
+                {% else %}
+                  <span class="badge bg-secondary"><i class="bi bi-file-earmark-play me-1"></i>Replay</span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="badge bg-{{ s.status_color }}">{{ s.get_status_display }}</span>
+              </td>
+              <td class="text-muted">{{ s.total_channels }}</td>
+              <td class="text-muted small">{{ s.duration_str }}</td>
+              <td>
+                <a href="{% url 'session_detail' s.pk %}"
+                   class="btn btn-sm btn-ghost" title="View">
+                  <i class="bi bi-arrow-right"></i>
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="dhn-empty-state">
+        <div class="dhn-empty-icon">🧬</div>
+        <p class="text-muted">No sessions yet.</p>
+        <a href="{% url 'session_new' %}" class="btn btn-purple">
+          <i class="bi bi-plus-lg me-1"></i>Create your first session
+        </a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# Network topology ─────────────────────────────────────────────────────── #}
+  <div class="col-lg-5">
+    <div class="dhn-card mb-4">
+      <div class="dhn-card-header">
+        <i class="bi bi-diagram-3 me-2"></i>Network Topology
+      </div>
+      <div class="p-3">
+        <pre class="dhn-topology mb-0">
+┌─────────────────────────────────────┐
+│           192.168.3.0/24            │
+│                                     │
+│  ┌──────────────────────────────┐   │
+│  │  ATLAS Amplifier             │   │
+│  │  192.168.3.10 (factory IP)   │   │
+│  └──────────────┬───────────────┘   │
+│                 │ UDP broadcast      │
+│        ┌────────┴────────┐          │
+│        │                 │          │
+│  ┌─────▼──────┐   ┌──────▼──────┐  │
+│  │  Pegasus   │   │  DHN-AQ     │  │
+│  │  .100      │   │  .50        │  │
+│  │  (Windows) │   │  (Ubuntu)   │  │
+│  └─────┬──────┘   └─────────────┘  │
+│        │ NetCom TCP                 │
+│        │ (Python ctypes bridge)     │
+│        │                            │
+│  ┌─────▼──────────────────────┐    │
+│  │  NRD Relay Bridge          │    │
+│  │  NRD → ATLAS-format UDP    │    │
+│  │  (replay mode only)        │    │
+│  └────────────────────────────┘    │
+└─────────────────────────────────────┘</pre>
+      </div>
+    </div>
+
+    <div class="dhn-card">
+      <div class="dhn-card-header">
+        <i class="bi bi-lightning me-2"></i>Quick Start
+      </div>
+      <div class="p-3">
+        <ol class="dhn-steps mb-0">
+          <li>Run <a href="{% url 'diagnostics' %}">Diagnostics</a> to verify network</li>
+          <li>Create a <a href="{% url 'session_new' %}">New Session</a></li>
+          <li>Choose <strong>Live ATLAS</strong> or <strong>NRD Replay</strong></li>
+          <li>Press <strong>▶ Start</strong> on the session page</li>
+          <li>Monitor logs in real-time</li>
+          <li>Press <strong>■ Stop</strong> to end recording</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /.row -->
+{% endblock %}
+
+{% block scripts %}
+{% if active_session %}
+<script>
+  // Poll active session status every 3 seconds
+  window._activePk = {{ active_session.pk }};
+  startDashboardPolling(window._activePk);
+</script>
+{% endif %}
+{% endblock %}

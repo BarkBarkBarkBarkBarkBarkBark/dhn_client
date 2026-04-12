@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% block title %}{{ session.name }} — darkhorse_neuralynx{% endblock %}
+{% block page_title %}{{ session.name }}{% endblock %}
+
+{% block topbar_actions %}
+  {% if session.status == "idle" or session.status == "completed" or session.status == "error" %}
+    <button id="btn-start" class="btn btn-success btn-sm"
+            data-pk="{{ session.pk }}" data-url="{% url 'session_start' session.pk %}">
+      <i class="bi bi-play-fill me-1"></i>Start
+    </button>
+  {% endif %}
+  {% if session.is_active %}
+    <button id="btn-stop" class="btn btn-danger btn-sm"
+            data-pk="{{ session.pk }}" data-url="{% url 'session_stop' session.pk %}">
+      <i class="bi bi-stop-fill me-1"></i>Stop
+    </button>
+  {% endif %}
+  <a href="{% url 'session_edit' session.pk %}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-pencil me-1"></i>Edit
+  </a>
+  <a href="{% url 'dashboard' %}" class="btn btn-sm btn-ghost">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+{% endblock %}
+
+{% block content %}
+
+{# ── Status strip ────────────────────────────────────────────────────────── #}
+<div class="dhn-status-strip mb-4" id="status-strip">
+  <div class="d-flex flex-wrap align-items-center gap-4">
+    <div>
+      <div class="text-muted small mb-1">Status</div>
+      <span class="badge bg-{{ session.status_color }} fs-6 px-3 py-2" id="status-badge">
+        {{ session.get_status_display }}
+      </span>
+    </div>
+    <div>
+      <div class="text-muted small mb-1">Mode</div>
+      <span class="fw-semibold">
+        {% if session.mode == "live" %}
+          <i class="bi bi-broadcast text-info me-1"></i>Live ATLAS
+        {% else %}
+          <i class="bi bi-file-earmark-play text-secondary me-1"></i>NRD Replay
+        {% endif %}
+      </span>
+    </div>
+    <div>
+      <div class="text-muted small mb-1">Duration</div>
+      <span id="duration-display">{{ session.duration_str }}</span>
+    </div>
+    <div>
+      <div class="text-muted small mb-1">Packets sent (relay)</div>
+      <span id="packets-display" class="font-monospace">{{ session.packets_sent|default:"0" }}</span>
+    </div>
+    <div>
+      <div class="text-muted small mb-1">Channels</div>
+      <span>{{ session.total_channels }}
+        <small class="text-muted">({{ session.n_macro }} macro + {{ session.n_micro }} micro)</small>
+      </span>
+    </div>
+    <div>
+      <div class="text-muted small mb-1">Compression</div>
+      <span class="badge bg-dark border border-secondary">{{ session.compression }}</span>
+    </div>
+  </div>
+</div>
+
+{# ── Two-column layout ───────────────────────────────────────────────────── #}
+<div class="row g-4">
+
+  {# Log terminal ────────────────────────────────────────────────────────── #}
+  <div class="col-lg-8">
+    <div class="dhn-card h-100">
+      <div class="dhn-card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-terminal me-2"></i>Session Log</span>
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm btn-ghost" id="btn-scroll-toggle" title="Auto-scroll">
+            <i class="bi bi-arrow-down-circle"></i> Auto-scroll
+          </button>
+          <button class="btn btn-sm btn-ghost" id="btn-copy-log" title="Copy log">
+            <i class="bi bi-clipboard"></i>
+          </button>
+        </div>
+      </div>
+      <div class="dhn-log-container" id="log-container">
+        <pre class="dhn-log-pre" id="log-content">{% if session.log_output %}{{ session.log_output }}{% else %}<span class="text-muted">Log output will appear here when the session starts…</span>{% endif %}</pre>
+      </div>
+    </div>
+  </div>
+
+  {# Config panel ─────────────────────────────────────────────────────────── #}
+  <div class="col-lg-4">
+
+    {# Error box #}
+    {% if session.error_message %}
+    <div class="alert alert-danger mb-4" id="error-box">
+      <i class="bi bi-exclamation-triangle me-2"></i>
+      <strong>Error:</strong><br>
+      <code class="small">{{ session.error_message }}</code>
+    </div>
+    {% endif %}
+
+    {# Network info #}
+    <div class="dhn-card mb-4">
+      <div class="dhn-card-header">
+        <i class="bi bi-diagram-2 me-2"></i>Network
+      </div>
+      <div class="p-3">
+        <table class="table table-sm table-dark mb-0 small">
+          <tbody>
+            <tr>
+              <td class="text-muted">ATLAS</td>
+              <td class="font-monospace">{{ session.atlas_ip }}</td>
+            </tr>
+            <tr>
+              <td class="text-muted">Pegasus</td>
+              <td class="font-monospace">{{ session.pegasus_ip }}</td>
+            </tr>
+            <tr>
+              <td class="text-muted">DHN-AQ</td>
+              <td class="font-monospace">{{ session.dhn_ip }}</td>
+            </tr>
+            <tr>
+              <td class="text-muted">Broadcast</td>
+              <td class="font-monospace">{{ session.broadcast_ip }}:{{ session.relay_port }}</td>
+            </tr>
+            <tr>
+              <td class="text-muted">Interface</td>
+              <td class="font-monospace">{{ session.dhn_interface }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {# RC file preview #}
+    <div class="dhn-card mb-4">
+      <div class="dhn-card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-file-text me-2"></i>RC File Preview</span>
+        <button class="btn btn-sm btn-ghost" id="btn-load-rc"
+                data-url="{% url 'preview_rc' session.pk %}">
+          <i class="bi bi-eye"></i> Load
+        </button>
+      </div>
+      <div id="rc-preview" class="p-3" style="display:none">
+        <pre class="dhn-rc-pre" id="rc-content"></pre>
+      </div>
+      <div id="rc-placeholder" class="p-3 text-muted small">
+        Click "Load" to generate and preview the DHN_Acq_rc.txt that will be
+        uploaded to the DHN box.
+      </div>
+    </div>
+
+    {# Timing #}
+    <div class="dhn-card">
+      <div class="dhn-card-header">
+        <i class="bi bi-clock-history me-2"></i>Timestamps
+      </div>
+      <div class="p-3">
+        <table class="table table-sm table-dark mb-0 small">
+          <tbody>
+            <tr>
+              <td class="text-muted">Created</td>
+              <td>{{ session.created_at|date:"Y-m-d H:i:s" }}</td>
+            </tr>
+            <tr>
+              <td class="text-muted">Started</td>
+              <td>{{ session.started_at|date:"H:i:s"|default:"—" }}</td>
+            </tr>
+            <tr>
+              <td class="text-muted">Ended</td>
+              <td>{{ session.ended_at|date:"H:i:s"|default:"—" }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /.col -->
+</div><!-- /.row -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+const SESSION_PK     = {{ session.pk }};
+const STATUS_URL     = "{% url 'session_status' session.pk %}";
+const START_URL      = "{% url 'session_start' session.pk %}";
+const STOP_URL       = "{% url 'session_stop' session.pk %}";
+const CSRF           = "{{ csrf_token }}";
+const INITIAL_STATUS = "{{ session.status }}";
+
+initSessionDetail(SESSION_PK, STATUS_URL, START_URL, STOP_URL, CSRF, INITIAL_STATUS);
+</script>
+{% endblock %}

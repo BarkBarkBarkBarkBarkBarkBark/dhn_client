@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Diagnostics — darkhorse_neuralynx{% endblock %}
+{% block page_title %}Pre-flight Diagnostics{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{% url 'dashboard' %}" class="btn btn-sm btn-ghost">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+
+{# ── Config panel ─────────────────────────────────────────────────────────── #}
+<div class="col-lg-4">
+  <div class="dhn-card mb-4">
+    <div class="dhn-card-header">
+      <i class="bi bi-sliders me-2"></i>IP Addresses
+    </div>
+    <div class="p-4">
+      <div class="mb-3">
+        <label class="form-label fw-semibold">ATLAS IP</label>
+        <input type="text" id="diag-atlas"   class="form-control font-monospace" value="192.168.3.10">
+        <div class="form-text">Factory-fixed firmware IP</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Pegasus IP</label>
+        <input type="text" id="diag-pegasus" class="form-control font-monospace" value="192.168.3.100">
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold">DHN-AQ IP</label>
+        <input type="text" id="diag-dhn"     class="form-control font-monospace" value="192.168.3.50">
+      </div>
+      <button id="btn-run-diag" class="btn btn-purple w-100">
+        <i class="bi bi-play-fill me-2"></i>Run Diagnostics
+      </button>
+    </div>
+  </div>
+
+  {# Cheat sheet #}
+  <div class="dhn-card">
+    <div class="dhn-card-header">
+      <i class="bi bi-lightbulb me-2"></i>Quick Fixes
+    </div>
+    <div class="p-3">
+      <dl class="mb-0 small">
+        <dt class="text-warning">ATLAS ping fails</dt>
+        <dd class="text-muted mb-2">
+          Check dedicated NIC is up: <code>ip link</code>.<br>
+          NIC needs static IP on 192.168.3.0/24.
+        </dd>
+        <dt class="text-warning">DHN SSH fails</dt>
+        <dd class="text-muted mb-2">
+          Run: <code>ssh {{ "{" }}{{ "dhn_ssh_user" }}{{ "}" }}@192.168.3.50</code><br>
+          Check sshd is running: <code>systemctl status ssh</code>
+        </dd>
+        <dt class="text-warning">xvfb not found</dt>
+        <dd class="text-muted mb-2">
+          On DHN box: <code>sudo apt install xvfb xdotool</code>
+        </dd>
+        <dt class="text-warning">DHN stalls on startup</dt>
+        <dd class="text-muted">
+          No ATLAS UDP = stall. In replay mode, ensure the relay bridge
+          is running <em>before</em> DHN-AQ launches.
+        </dd>
+      </dl>
+    </div>
+  </div>
+</div>
+
+{# ── Results panel ────────────────────────────────────────────────────────── #}
+<div class="col-lg-8">
+  <div class="dhn-card">
+    <div class="dhn-card-header">
+      <i class="bi bi-activity me-2"></i>Check Results
+      <span id="diag-summary" class="ms-auto text-muted small"></span>
+    </div>
+    <div id="diag-results" class="p-4">
+
+      {# Placeholder before first run #}
+      <div id="diag-placeholder" class="dhn-empty-state">
+        <div class="dhn-empty-icon">🔍</div>
+        <p class="text-muted">Set your IPs and click <strong>Run Diagnostics</strong>.</p>
+        <p class="text-muted small">
+          Checks: ATLAS ping, Pegasus ping, DHN-AQ ping, SSH,
+          subnet, xvfb, xdotool, ATLAS UDP port.
+        </p>
+      </div>
+
+      {# Spinner while running #}
+      <div id="diag-spinner" style="display:none" class="text-center py-5">
+        <div class="spinner-border text-purple" role="status">
+          <span class="visually-hidden">Running…</span>
+        </div>
+        <p class="text-muted mt-3">Running checks…</p>
+      </div>
+
+      {# Result cards injected by JS #}
+      <div id="diag-list" style="display:none" class="d-flex flex-column gap-3"></div>
+
+      {# Error state #}
+      <div id="diag-error" class="alert alert-danger" style="display:none"></div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /.row -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('btn-run-diag').addEventListener('click', async () => {
+  const atlas   = document.getElementById('diag-atlas').value;
+  const pegasus = document.getElementById('diag-pegasus').value;
+  const dhn     = document.getElementById('diag-dhn').value;
+
+  // Show spinner
+  document.getElementById('diag-placeholder').style.display = 'none';
+  document.getElementById('diag-list').style.display       = 'none';
+  document.getElementById('diag-error').style.display      = 'none';
+  document.getElementById('diag-spinner').style.display    = '';
+
+  try {
+    const url = `{% url 'run_diagnostics' %}?atlas_ip=${encodeURIComponent(atlas)}&pegasus_ip=${encodeURIComponent(pegasus)}&dhn_ip=${encodeURIComponent(dhn)}`;
+    const resp = await fetch(url);
+    const data = await resp.json();
+
+    document.getElementById('diag-spinner').style.display = 'none';
+
+    if (data.error) {
+      const errEl = document.getElementById('diag-error');
+      errEl.textContent = `Error: ${data.error}`;
+      errEl.style.display = '';
+      return;
+    }
+
+    const listEl = document.getElementById('diag-list');
+    listEl.innerHTML = '';
+
+    let passed = 0, failed = 0;
+    data.results.forEach(r => {
+      if (r.ok) passed++; else failed++;
+      const card = document.createElement('div');
+      card.className = `dhn-diag-check ${r.ok ? 'ok' : 'fail'}`;
+      card.innerHTML = `
+        <div class="dhn-diag-icon">${r.ok ? '✅' : '❌'}</div>
+        <div class="flex-grow-1">
+          <div class="fw-semibold">${r.name}</div>
+          <div class="text-muted small">${r.message}</div>
+          ${!r.ok && r.fix ? `<div class="dhn-diag-fix mt-1"><i class="bi bi-tools me-1"></i>${r.fix}</div>` : ''}
+        </div>
+      `;
+      listEl.appendChild(card);
+    });
+
+    listEl.style.display = '';
+    const summEl = document.getElementById('diag-summary');
+    summEl.innerHTML = `<span class="text-success">${passed} passed</span> / <span class="text-danger">${failed} failed</span>`;
+
+  } catch (e) {
+    document.getElementById('diag-spinner').style.display = 'none';
+    const errEl = document.getElementById('diag-error');
+    errEl.textContent = `Request failed: ${e.message}`;
+    errEl.style.display = '';
+  }
+});
+</script>
+{% endblock %}

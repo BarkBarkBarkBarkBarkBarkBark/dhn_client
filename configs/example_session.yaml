@@ -1,0 +1,66 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# darkhorse_neuralynx  — Example Session Config
+# Copy this file, fill in real values, and run:
+#   dhn-orchestrate --config my_session.yaml
+# ─────────────────────────────────────────────────────────────────────────────
+
+# "live"   = real ATLAS hardware acquisition
+# "replay" = NRD file replay through relay bridge
+mode: replay
+
+session_name: "P60CS_Jie_MemSeg_replay_2026-04-12"
+description:  "NRD replay of epilepsy dataset — memory segmentation task"
+
+# ── Network ──────────────────────────────────────────────────────────────────
+network:
+  atlas_ip:               "192.168.3.10"   # ATLAS hardware IP (fixed by Nlx)
+  atlas_port:              26090           # ATLAS hardware port (fixed)
+  pegasus_ip:             "192.168.3.100"  # Pegasus PC static IP on hardware NIC
+  pegasus_netcom_server:  "localhost"      # NetCom server (localhost if relay on same box)
+  dhn_ip:                 "192.168.3.50"   # DHN Linux box IP — ASSIGN THIS STATICALLY
+  dhn_ssh_user:           "dhn"
+  dhn_ssh_key:            null             # null = use ~/.ssh/id_rsa
+  dhn_interface:          "eno1"           # Check with: ip link show
+  broadcast_ip:           "192.168.3.255"  # Subnet broadcast address
+
+# ── Pegasus ───────────────────────────────────────────────────────────────────
+pegasus:
+  executable:   'C:\Program Files\Neuralynx\Pegasus\Pegasus.exe'
+  config_file:  'nrdReplay\Replay_Atlas_generic.cfg'
+  nrd_file:     'C:\dataRaw\P60CS_Jie\RawData.nrd'   # REQUIRED for replay mode
+  replay_speed: "slowest"
+  auto_start:   true
+  netcom_dll:   'nrdReplay\neuralynxNetcom201\MatlabNetComClient2_x64.dll'
+
+# ── DHN-AQ ────────────────────────────────────────────────────────────────────
+dhn:
+  executable:           "/opt/DHN/DHN_Acq"
+  rc_file:              "/home/dhn/DHN_Acq_rc.txt"
+  cs_file:              "/home/dhn/DHN_Acq_cs.csv"
+  data_dir:             "/mnt/dhndev/recordings"
+  n_channels:           512
+  macro_channels:       256               # channels 1–256 = macros
+  micro_channels:       256               # channels 257–512 = micros
+  macro_decimation_hz:  2000.0            # downsample macros to ~2 kHz
+  micro_decimation_hz:  0.0              # micros at full 32 kHz (no decimation)
+  compression:          "PRED"           # PRED=lossless; VDS=lossy
+  receive_as_broadcast: true
+  subject_id:           "P60CS_Jie"
+  xvfb_display:         99
+
+# ── MATLAB expStarter (optional) ──────────────────────────────────────────────
+matlab:
+  enabled:      true
+  matlab_exe:   'C:\Program Files\MATLAB\R2024b\bin\matlab.exe'
+  script_path:  'nrdReplay\NetCom_expStarter_ATLAS_AC.m'
+  addpath:
+    - 'nrdReplay\neuralynxNetcom201'
+  variables:
+    # Override variables in the MATLAB script (string values are auto-quoted)
+    fname:        'C:\timestamps\P60CS_Jie_timestampsInclude.txt'
+    serverName:   'localhost'
+    objectIndex:  '10'
+
+# ── Relay bridge (replay mode only) ──────────────────────────────────────────
+relay_port:    26090    # must match DHN RC "Receiving Port Number"
+relay_poll_ms: 20.0     # how often to poll Pegasus NetCom for new records (ms)
