@@ -13,7 +13,7 @@ One Python repo that bridges **Neuralynx Pegasus** → **DHN-AQ** for both live 
 {: .fs-5 .fw-300 }
 
 [Get started now]({{ site.baseurl }}/getting-started){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
-[View on GitHub](https://github.com/your-org/darkhorse_neuralynx){: .btn .fs-5 .mb-4 .mb-md-0 }
+[View on GitHub](https://github.com/BarkBarkBarkBarkBarkBarkBark/dhn_client){: .btn .fs-5 .mb-4 .mb-md-0 }
 
 ---
 
@@ -61,7 +61,7 @@ This project fixes that, and goes further:
 
 ```bash
 # 1. Clone
-git clone https://github.com/your-org/darkhorse_neuralynx
+git clone https://github.com/BarkBarkBarkBarkBarkBarkBark/dhn_client
 cd darkhorse_neuralynx
 
 # 2. Install library

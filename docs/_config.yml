@@ -5,9 +5,9 @@ description: "Python orchestration pipeline for Neuralynx ATLAS → DHN-AQ neura
 remote_theme: just-the-docs/just-the-docs@v0.8.2
 color_scheme: dark
 
-# Site URL (update to your GitHub Pages URL after publishing)
-url: "https://your-org.github.io"
-baseurl: "/darkhorse_neuralynx"
+# Site URL
+url: "https://barkbarkbarkbarkbarkbarkbark.github.io"
+baseurl: "/dhn_client"
 
 # Navigation
 nav_sort: case_sensitive
@@ -29,7 +29,7 @@ search:
 # Aux links (right of nav)
 aux_links:
   "GitHub":
-    - "https://github.com/your-org/darkhorse_neuralynx"
+    - "https://github.com/BarkBarkBarkBarkBarkBarkBark/dhn_client"
 
 aux_links_new_tab: true
 

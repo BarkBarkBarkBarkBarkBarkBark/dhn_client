@@ -39,8 +39,8 @@ Install the library, launch the Django web app, and run your first replay sessio
 ## Step 1 — Clone the repository
 
 ```bash
-git clone https://github.com/your-org/darkhorse_neuralynx
-cd darkhorse_neuralynx
+git clone https://github.com/BarkBarkBarkBarkBarkBarkBark/dhn_client
+cd dhn_client
 ```
 
 ---
