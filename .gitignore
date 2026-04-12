@@ -1,0 +1,18 @@
+# Neuralynx proprietary binaries — never commit
+*.exe
+*.dll
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Django
+webapp/db.sqlite3
+webapp/staticfiles/
+
+# macOS
+.DS_Store
