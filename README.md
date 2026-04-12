@@ -2,6 +2,8 @@
 
 **A Python orchestration layer for recording Neuralynx ATLAS/Pegasus data directly into [MED format](https://github.com/MEDFormat/MED) via [DHN-AQ](https://darkhorseneuro.com) — including programmatic NRD file replay without a monitor.**
 
+[Read the Docs !](https://barkbarkbarkbarkbarkbarkbark.github.io/dhn_client/)
+
 ---
 
 ## What This Repo Does
